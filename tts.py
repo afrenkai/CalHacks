@@ -4,7 +4,6 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from ssm_cls_head import SSMClassificationHead
 import os
 
-# CPU optimizations
 device = "cuda" if torch.cuda.is_avalable() else 'cpu'
 torch.set_num_threads(os.cpu_count())  # Use all CPU cores
 torch.set_grad_enabled(False)  # Disable gradients for inference
@@ -14,7 +13,6 @@ model_name = "ibm-granite/granite-speech-3.3-8b"
 processor = AutoProcessor.from_pretrained(model_name)
 tokenizer = processor.tokenizer
 
-# Load model with CPU-friendly settings
 model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_name,
     device_map=device,
