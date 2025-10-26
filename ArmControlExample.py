@@ -387,8 +387,8 @@ def main():
 
         print("\n--- Arms ready for commands. ---")
         print("Commands:")
-        print("  [white/black/both]-[yes/no/maybe] - Direct gesture control")
-        print("  audio <path> [target] - Process audio file (target: white/black/both, default: both)")
+        print("  y/n/m - Gesture control (yes/no/maybe) - both arms")
+        print("  audio <path> - Process audio file (always both arms)")
         print("  dance | poweroff | wakeup | exit")
 
         # --- Command Loop ---
@@ -402,19 +402,13 @@ def main():
             if command.startswith('audio '):
                 parts = command.split()
                 if len(parts) < 2:
-                    print("Usage: audio <path> [target]")
-                    print("  target: white/black/both (default: both)")
+                    print("Usage: audio <path>")
                     continue
 
                 audio_path = parts[1]
-                target = parts[2] if len(parts) > 2 else 'both'
 
                 if not os.path.exists(audio_path):
                     print(f"Error: Audio file not found: {audio_path}")
-                    continue
-
-                if target not in ['white', 'black', 'both']:
-                    print(f"Invalid target: {target}. Use white/black/both")
                     continue
 
                 if activity_event.is_set():
@@ -425,15 +419,10 @@ def main():
                     # Process audio file
                     gesture, text, probs = process_audio_file(audio_path)
                     print(f"\n>>> Detected gesture: {gesture.upper()}")
-                    print(f">>> Executing on: {target.upper()}")
+                    print(f">>> Executing on: BOTH")
 
-                    # Determine which controllers to use
-                    if target == 'white':
-                        controllers_locks = [(controller_white, white_lock)]
-                    elif target == 'black':
-                        controllers_locks = [(controller_black, black_lock)]
-                    else:  # both
-                        controllers_locks = [(controller_white, white_lock), (controller_black, black_lock)]
+                    # Always use both controllers
+                    controllers_locks = [(controller_white, white_lock), (controller_black, black_lock)]
 
                     # Select gesture function
                     if gesture == 'yes':
@@ -447,8 +436,8 @@ def main():
                     for i, (controller, lock) in enumerate(controllers_locks):
                         t = threading.Thread(target=gesture_func, args=(controller, lock))
                         t.start()
-                        if target == 'both' and i == 0:
-                            time.sleep(random.uniform(0.1, 0.4))  # Stagger 'both'
+                        if i == 0:
+                            time.sleep(random.uniform(0.1, 0.4))  # Stagger both arms
 
                 except Exception as e:
                     print(f"Error processing audio: {e}")
@@ -502,46 +491,31 @@ def main():
                 print("--- Activity finished. ---")
                 continue
 
-            # --- Gesture Command Parsing ---
-            try:
-                target, gesture = command.split('-')
-            except ValueError:
-                print("Invalid command. Format: 'target-gesture' or activity name")
-                continue
+            # --- Single Letter Gesture Commands (y, n, m) ---
+            if command in ['y', 'n', 'm']:
+                if activity_event.is_set():
+                    print("Cannot perform gesture: Arms are in 'poweroff' state. Use 'wakeup'.")
+                    continue
 
-            if activity_event.is_set():
-                print(
-                    "Cannot perform gesture: An activity is in progress or arms are in 'poweroff' state. Use 'wakeup'.")
-                continue
+                # Map single letter to gesture function
+                gesture_map = {
+                    'y': gesture_yes,
+                    'n': gesture_no,
+                    'm': gesture_maybe
+                }
+                gesture_func = gesture_map[command]
 
-            # Target the correct controller and lock
-            if target == 'white':
-                controllers_locks = [(controller_white, white_lock)]
-            elif target == 'black':
-                controllers_locks = [(controller_black, black_lock)]
-            elif target == 'both':
+                # Always use both controllers
                 controllers_locks = [(controller_white, white_lock), (controller_black, black_lock)]
-            else:
-                print(f"Unknown target: {target}");
-                continue
 
-            # Select the correct gesture function
-            if gesture == 'yes':
-                gesture_func = gesture_yes
-            elif gesture == 'no':
-                gesture_func = gesture_no
-            elif gesture == 'maybe':
-                gesture_func = gesture_maybe
+                # Execute gesture on both arms
+                for i, (controller, lock) in enumerate(controllers_locks):
+                    t = threading.Thread(target=gesture_func, args=(controller, lock))
+                    t.start()
+                    if i == 0:
+                        time.sleep(random.uniform(0.1, 0.4))  # Stagger both arms
             else:
-                print(f"Unknown gesture: {gesture}");
-                continue
-
-            # --- Execute Commands in Threads ---
-            for i, (controller, lock) in enumerate(controllers_locks):
-                t = threading.Thread(target=gesture_func, args=(controller, lock))
-                t.start()
-                if target == 'both' and i == 0:
-                    time.sleep(random.uniform(0.1, 0.4))  # Stagger 'both'
+                print(f"Unknown command: {command}")
 
     except Exception as e:
         print(f"\n An unexpected error occurred in main loop: {e}")
