@@ -30,9 +30,8 @@ def transcribe_audio(audio_path):
     
     return transcription
 
-# Example usage
 if __name__ == "__main__":
-    audio_file = input("Enter the path to your audio file: ")
+    audio_file = input("hello-biden-its-zelensky.mp3")
     
     try:
         print("Transcribing...")
