@@ -8,6 +8,7 @@ dependencies = [
     "hf-transfer>=0.1.9",
     "librosa>=0.11.0",
     "peft>=0.17.1",
+    "pyserial>=3.5",
     "torch>=2.9.0",
     "torchaudio>=2.9.0",
     "torchcodec>=0.8.0",

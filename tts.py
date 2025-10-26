@@ -4,7 +4,7 @@ from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
 from ssm_cls_head import SSMClassificationHead
 import os
 
-device = "cuda" if torch.cuda.is_avalable() else 'cpu'
+device = "cuda" if torch.cuda.is_available() else 'cpu'
 torch.set_num_threads(os.cpu_count())  # Use all CPU cores
 torch.set_grad_enabled(False)  # Disable gradients for inference
 

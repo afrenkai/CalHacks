@@ -2,10 +2,12 @@ import serial
 import time
 import random
 import threading
+import os
+from pathlib import Path
 
 # --- Constants ---
-MY_PORT_WHITE = "COM7"
-MY_PORT_BLACK = "COM8"
+MY_PORT_WHITE = "/dev/ttyACM0"
+MY_PORT_BLACK = "/dev/ttyACM1"
 BAUDRATE = 1000000
 
 HEADER = [0xFF, 0xFF]
@@ -18,6 +20,58 @@ SERVOS_ZERO = [2048, 2048, 2048, 2048, 2048]
 # Servo: 1   2    3    4   5
 NATURAL_POS = [0, -40, -20, 60, 0]
 FOLDING_POS = [0, -90, 90, -90, 0]
+
+# --- TTS Integration ---
+_tts_loaded = False
+_tts_module = None
+
+def load_tts():
+    """Lazy load TTS module to avoid startup overhead"""
+    global _tts_loaded, _tts_module
+    if not _tts_loaded:
+        print("Loading TTS system (this may take a moment)...")
+        try:
+            import tts as tts_module
+            _tts_module = tts_module
+            _tts_loaded = True
+            print("TTS system loaded successfully.")
+        except Exception as e:
+            print(f"Error loading TTS: {e}")
+            raise
+    return _tts_module
+
+def process_audio_file(audio_path, classifier_model_path=None):
+    """
+    Process an audio file and return the predicted gesture.
+
+    Args:
+        audio_path: Path to audio file
+        classifier_model_path: Optional path to trained classifier weights
+    Returns:
+        gesture: 'yes', 'no', or 'maybe'
+        text: Transcribed text
+        probabilities: Class probabilities
+    """
+    tts = load_tts()
+
+    print(f"\nProcessing audio: {audio_path}")
+    print("Transcribing...")
+    text, prediction, probabilities = tts.transcribe_and_classify(audio_path, classifier_model_path)
+
+    print(f"Transcription: {text}")
+    print(f"Classification: {prediction}")
+    print(f"Probabilities: yes={probabilities[0]:.3f}, no={probabilities[1]:.3f}, maybe={probabilities[2]:.3f}")
+
+    # Map prediction to gesture
+    # The prediction from tts.py can be 'yes', 'no', or 'maybe/confusion'
+    if 'yes' in prediction.lower():
+        gesture = 'yes'
+    elif 'no' in prediction.lower():
+        gesture = 'no'
+    else:
+        gesture = 'maybe'
+
+    return gesture, text, probabilities
 
 
 # --- Helper Function ---
@@ -362,7 +416,10 @@ def main():
         t_black_idle.start()
 
         print("\n--- Arms are now idling. Ready for commands. ---")
-        print("Commands: [white/black/both]-[yes/no/maybe] | dance | poweroff | wakeup | exit")
+        print("Commands:")
+        print("  [white/black/both]-[yes/no/maybe] - Direct gesture control")
+        print("  audio <path> [target] - Process audio file (target: white/black/both, default: both)")
+        print("  dance | poweroff | wakeup | exit")
 
         # --- Command Loop ---
         while True:
@@ -370,6 +427,65 @@ def main():
 
             if command == 'exit':
                 break
+
+            # --- Audio Command ---
+            if command.startswith('audio '):
+                parts = command.split()
+                if len(parts) < 2:
+                    print("Usage: audio <path> [target]")
+                    print("  target: white/black/both (default: both)")
+                    continue
+
+                audio_path = parts[1]
+                target = parts[2] if len(parts) > 2 else 'both'
+
+                if not os.path.exists(audio_path):
+                    print(f"Error: Audio file not found: {audio_path}")
+                    continue
+
+                if target not in ['white', 'black', 'both']:
+                    print(f"Invalid target: {target}. Use white/black/both")
+                    continue
+
+                if activity_event.is_set():
+                    print("Cannot process audio: Arms are in 'poweroff' state. Use 'wakeup' first.")
+                    continue
+
+                try:
+                    # Process audio file
+                    gesture, text, probs = process_audio_file(audio_path)
+                    print(f"\n>>> Detected gesture: {gesture.upper()}")
+                    print(f">>> Executing on: {target.upper()}")
+
+                    # Determine which controllers to use
+                    if target == 'white':
+                        controllers_locks = [(controller_white, white_lock)]
+                    elif target == 'black':
+                        controllers_locks = [(controller_black, black_lock)]
+                    else:  # both
+                        controllers_locks = [(controller_white, white_lock), (controller_black, black_lock)]
+
+                    # Select gesture function
+                    if gesture == 'yes':
+                        gesture_func = gesture_yes
+                    elif gesture == 'no':
+                        gesture_func = gesture_no
+                    else:
+                        gesture_func = gesture_maybe
+
+                    # Execute gesture
+                    for i, (controller, lock) in enumerate(controllers_locks):
+                        t = threading.Thread(target=gesture_func, args=(controller, lock))
+                        t.start()
+                        if target == 'both' and i == 0:
+                            time.sleep(random.uniform(0.1, 0.4))  # Stagger 'both'
+
+                except Exception as e:
+                    print(f"Error processing audio: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+                continue
 
             # --- Dance Command ---
             if command == 'dance':
