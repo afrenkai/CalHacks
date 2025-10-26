@@ -5,7 +5,7 @@ from ssm_cls_head import SSMClassificationHead
 import os
 
 # CPU optimizations
-device = "cpu"
+device = "cuda" if torch.cuda.is_avalable() else 'cpu'
 torch.set_num_threads(os.cpu_count())  # Use all CPU cores
 torch.set_grad_enabled(False)  # Disable gradients for inference
 
@@ -17,14 +17,10 @@ tokenizer = processor.tokenizer
 # Load model with CPU-friendly settings
 model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_name,
-    device_map="cpu",
-    torch_dtype=torch.float32,  # CPU doesn't support bfloat16 efficiently
+    device_map=device,
     low_cpu_mem_usage=True,  # Reduce memory usage
 )
 
-# Enable CPU-specific optimizations
-if hasattr(torch, 'set_float32_matmul_precision'):
-    torch.set_float32_matmul_precision('high')
 
 ssm_classifier = SSMClassificationHead()
 
@@ -55,12 +51,10 @@ def transcribe_audio(audio_path):
     prompt = tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
     
     model_inputs = processor(prompt, wav, device=device, return_tensors="pt")
-    # CPU-optimized generation settings
     model_outputs = model.generate(
         **model_inputs,
         max_new_tokens=200,
         do_sample=False,
-        num_beams=1,  # Greedy decoding is fastest on CPU
         use_cache=True,  # Enable KV caching
         pad_token_id=tokenizer.pad_token_id
     )
