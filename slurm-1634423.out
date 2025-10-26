@@ -1,0 +1,6 @@
+Loading cuda/12.9.0/a7ap4jl
+  Loading requirement: libiconv/1.17/43rr47g xz/5.4.6/dnpbdlz
+    zlib-ng/2.1.6/wmsrr57 libxml2/2.10.3/slxho4w
+Loading checkpoint shards:   0%|          | 0/9 [00:00<?, ?it/s]Loading checkpoint shards:  11%|█         | 1/9 [00:01<00:10,  1.26s/it]Loading checkpoint shards:  22%|██▏       | 2/9 [00:02<00:08,  1.24s/it]Loading checkpoint shards:  33%|███▎      | 3/9 [00:03<00:07,  1.24s/it]Loading checkpoint shards:  44%|████▍     | 4/9 [00:04<00:06,  1.23s/it]Loading checkpoint shards:  56%|█████▌    | 5/9 [00:06<00:05,  1.25s/it]Loading checkpoint shards:  67%|██████▋   | 6/9 [00:07<00:03,  1.27s/it]Loading checkpoint shards:  78%|███████▊  | 7/9 [00:08<00:02,  1.27s/it]Loading checkpoint shards:  89%|████████▉ | 8/9 [00:10<00:01,  1.28s/it]Loading checkpoint shards: 100%|██████████| 9/9 [00:11<00:00,  1.19s/it]Loading checkpoint shards: 100%|██████████| 9/9 [00:11<00:00,  1.23s/it]
+Transcribing...
+Error: Invalid text provided! Text should be a string or list of strings.
