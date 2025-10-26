@@ -3,6 +3,7 @@ import time
 import random
 import threading
 import os
+import sys
 from pathlib import Path
 
 # --- Constants ---
@@ -141,6 +142,55 @@ class ServoController:
         packet = bytes(HEADER + data + [checksum])
         self.serial.write(packet)
 
+    def animate_listening(self, duration=3):
+        """Animate listening state for specified duration"""
+        start_time = time.time()
+        frame_idx = 0
+
+        print("\n" + "="*40)
+        print("="*40)
+
+        while time.time() - start_time < duration:
+            # Clear previous frame (move cursor up)
+            sys.stdout.write("\033[F" * 10)
+
+            # Print current frame
+            frame_idx += 1
+            time.sleep(0.2)
+
+        sys.stdout.write("\033[F" * 10)
+        print(" " * 50)
+
+    def get_random_response(self):
+        """Get random response: yes, no, or maybe"""
+        responses = ["yes", "no", "maybe"]
+        return random.choice(responses)
+
+    def respond_to_command(self, response):
+        """Execute servo movements based on response"""
+        if response == "yes":
+            # Nod yes
+            print("  [Nodding YES]")
+            self.set_angle(5, 30)
+            time.sleep(0.3)
+            self.set_angle(5, -30)
+            time.sleep(0.3)
+            self.set_angle(5, 0)
+        elif response == "no":
+            # Shake no
+            print("  [Shaking NO]")
+            self.set_angle(1, -30)
+            time.sleep(0.3)
+            self.set_angle(1, 30)
+            time.sleep(0.3)
+            self.set_angle(1, 0)
+        else:  # maybe
+            # Tilt confusion
+            print("  [Tilting MAYBE]")
+            self.set_angle(1, 20)
+            time.sleep(0.5)
+            self.set_angle(1, 0)
+
 
 # --- Gesture Functions (Lock-Acquiring) ---
 
@@ -160,25 +210,10 @@ def gesture_yes(controller, lock, repetitions=3, speed=0.45):
     print(f"Port {controller.serial.port}: YES complete.")
 
 
-def gesture_no(controller, lock, repetitions=3, speed=0.3):
-    """ Performs a 'no' head shake. """
+def gesture_no(controller, lock, speed=0.8):
+    """ Performs a 'no' hunch. """
     with lock:
         print(f"Port {controller.serial.port}: Gesturing NO")
-        head_neutral = NATURAL_POS[4]
-        for _ in range(repetitions):
-            controller.set_angle(5, head_neutral + 60);
-            time.sleep(speed)
-            controller.set_angle(5, head_neutral - 60);
-            time.sleep(speed)
-        controller.set_angle(5, head_neutral);
-        time.sleep(speed)
-    print(f"Port {controller.serial.port}: NO complete.")
-
-
-def gesture_maybe(controller, lock, speed=0.8):
-    """ Performs a 'maybe' hunch. """
-    with lock:
-        print(f"Port {controller.serial.port}: Gesturing MAYBE")
         controller.set_angle(5, NATURAL_POS[4] - 40)
         controller.set_angle(4, NATURAL_POS[3] - 20)
         controller.set_angle(3, NATURAL_POS[2] + 20)
@@ -186,6 +221,21 @@ def gesture_maybe(controller, lock, speed=0.8):
         controller.set_angle(5, NATURAL_POS[4] + 40);
         time.sleep(speed)
         controller.set_natural_position();
+        time.sleep(speed)
+    print(f"Port {controller.serial.port}: NO complete.")
+
+
+def gesture_maybe(controller, lock, repetitions=3, speed=0.3):
+    """ Performs a 'maybe' head shake. """
+    with lock:
+        print(f"Port {controller.serial.port}: Gesturing MAYBE")
+        head_neutral = NATURAL_POS[4]
+        for _ in range(repetitions):
+            controller.set_angle(5, head_neutral + 60);
+            time.sleep(speed)
+            controller.set_angle(5, head_neutral - 60);
+            time.sleep(speed)
+        controller.set_angle(5, head_neutral);
         time.sleep(speed)
     print(f"Port {controller.serial.port}: MAYBE complete.")
 

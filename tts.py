@@ -1,6 +1,6 @@
 import torch
 import torchaudio
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from ssm_cls_head import SSMClassificationHead
 import os
 
@@ -8,62 +8,48 @@ device = "cuda" if torch.cuda.is_available() else 'cpu'
 torch.set_num_threads(os.cpu_count())  # Use all CPU cores
 torch.set_grad_enabled(False)  # Disable gradients for inference
 
-model_name = "ibm-granite/granite-speech-3.3-8b"
+# Use wav2vec2-base for much lower memory usage (~360MB vs 8GB for Granite)
+model_name = "facebook/wav2vec2-base-960h"
 
-processor = AutoProcessor.from_pretrained(model_name)
-tokenizer = processor.tokenizer
-
-model = AutoModelForSpeechSeq2Seq.from_pretrained(
-    model_name,
-    device_map=device,
-    low_cpu_mem_usage=True,  # Reduce memory usage
-)
-
+processor = Wav2Vec2Processor.from_pretrained(model_name)
+model = Wav2Vec2ForCTC.from_pretrained(model_name).to(device)
+model.eval()
 
 ssm_classifier = SSMClassificationHead()
 
 def transcribe_audio(audio_path):
     """
-    Transcribe audio file to text
-    
+    Transcribe audio file to text using wav2vec2
+
     Args:
         audio_path: Path to audio file (wav, mp3, flac, etc.)
     Returns:
         Transcribed text as string
     """
+    # Load and preprocess audio
     wav, sr = torchaudio.load(audio_path, normalize=True)
-    
+
+    # Convert to mono if stereo
     if wav.shape[0] > 1:
         wav = torch.mean(wav, dim=0, keepdim=True)
-    
+
+    # Resample to 16kHz if needed (wav2vec2 requires 16kHz)
     if sr != 16000:
         resampler = torchaudio.transforms.Resample(sr, 16000)
         wav = resampler(wav)
-    
-    system_prompt = "Knowledge Cutoff Date: April 2024.\nToday's Date: April 9, 2025.\nYou are Granite, developed by IBM. You are a helpful AI assistant"
-    user_prompt = "<|audio|>can you transcribe the speech into a written format?"
-    chat = [
-        dict(role="system", content=system_prompt),
-        dict(role="user", content=user_prompt),
-    ]
-    prompt = tokenizer.apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
-    
-    model_inputs = processor(prompt, wav, device=device, return_tensors="pt")
-    model_outputs = model.generate(
-        **model_inputs,
-        max_new_tokens=200,
-        do_sample=False,
-        use_cache=True,  # Enable KV caching
-        pad_token_id=tokenizer.pad_token_id
-    )
-    
-    num_input_tokens = model_inputs["input_ids"].shape[-1]
-    new_tokens = torch.unsqueeze(model_outputs[0, num_input_tokens:], dim=0)
-    output_text = tokenizer.batch_decode(
-        new_tokens, add_special_tokens=False, skip_special_tokens=True
-    )
-    
-    return output_text[0]
+
+    # Process audio and run inference
+    input_values = processor(wav.squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_values
+    input_values = input_values.to(device)
+
+    with torch.no_grad():
+        logits = model(input_values).logits
+
+    # Decode the predicted ids to text
+    predicted_ids = torch.argmax(logits, dim=-1)
+    transcription = processor.decode(predicted_ids[0])
+
+    return transcription
 
 
 def classify_transcription(text, model_path=None):
@@ -102,8 +88,7 @@ def transcribe_and_classify(audio_path, classifier_model_path=None):
 
 
 if __name__ == "__main__":
-    audio_file = "hello-biden-its-zelensky.mp3"
-
+    audio_file = "do-not-redeem_z7RLKwV.mp3"  
     try:
         print("Transcribing...")
         text = transcribe_audio(audio_file)
