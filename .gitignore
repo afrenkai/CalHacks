@@ -209,3 +209,6 @@ __marimo__/
 slurm*
 *.pth
 node_modules/*
+
+# Frontend
+frontend/
