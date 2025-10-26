@@ -240,82 +240,10 @@ def gesture_maybe(controller, lock, repetitions=3, speed=0.3):
     print(f"Port {controller.serial.port}: MAYBE complete.")
 
 
-# --- Idle Gestures (All must acquire lock) ---
-
-def gesture_simple_twitch(controller, lock):
-    """ 5/8 Idle Gestures: A simple, single-servo twitch. """
-    with lock:
-        servo_to_move = random.choice([1, 2, 3, 4, 5])
-        offset = random.uniform(-15, 15) if servo_to_move not in [2, 3] else random.uniform(-10, 10)
-        base_angle = NATURAL_POS[servo_to_move - 1]
-        controller.set_angle(servo_to_move, base_angle + offset)
-        time.sleep(random.uniform(0.5, 0.8))
-        controller.set_angle(servo_to_move, base_angle)
+# --- Idle Gestures (REMOVED) ---
 
 
-def gesture_idle_look_around(controller, lock):
-    """ 1/8 Idle: Base and head look left and right. """
-    with lock:
-        print(f"Port {controller.serial.port}: Idle: Look around...")
-        controller.set_angle(1, NATURAL_POS[0] + 20);
-        controller.set_angle(5, NATURAL_POS[4] + 40)
-        time.sleep(random.uniform(1.0, 1.5))
-        controller.set_angle(1, NATURAL_POS[0] - 20);
-        controller.set_angle(5, NATURAL_POS[4] - 40)
-        time.sleep(random.uniform(1.0, 1.5))
-        controller.set_angle(1, NATURAL_POS[0]);
-        controller.set_angle(5, NATURAL_POS[4])
-        time.sleep(0.5)
-
-
-def gesture_idle_stretch(controller, lock):
-    """ 1/8 Idle: A small "stretch" up and back. """
-    with lock:
-        print(f"Port {controller.serial.port}: Idle: Stretch...")
-        controller.set_angle(2, NATURAL_POS[1] - 20)  # Knees
-        controller.set_angle(3, NATURAL_POS[2] - 20)  # Back
-        controller.set_angle(4, NATURAL_POS[3] + 10)  # Neck
-        time.sleep(1.2)
-        controller.set_natural_position()
-        time.sleep(0.5)
-
-
-def gesture_idle_head_tilt(controller, lock):
-    """ 1/8 Idle: A curious head tilt side-to-side. """
-    with lock:
-        print(f"Port {controller.serial.port}: Idle: Head tilt...")
-        controller.set_angle(5, NATURAL_POS[4] + 35);
-        time.sleep(random.uniform(0.8, 1.3))
-        controller.set_angle(5, NATURAL_POS[4] - 35);
-        time.sleep(random.uniform(0.8, 1.3))
-        controller.set_angle(5, NATURAL_POS[4]);
-        time.sleep(0.5)
-
-
-# --- Idle Gesture Pool ---
-IDLE_GESTURE_POOL = [
-    gesture_simple_twitch, gesture_simple_twitch, gesture_simple_twitch,
-    gesture_simple_twitch, gesture_simple_twitch,
-    gesture_idle_look_around, gesture_idle_stretch, gesture_idle_head_tilt
-]
-
-
-# --- Idle Loop Thread ---
-def idle_loop(controller, lock, stop_event, activity_event):
-    """
-    Runs in a background thread.
-    Waits, and if no activity is running, performs a random idle gesture.
-    """
-    while not stop_event.is_set():
-        time.sleep(random.uniform(3.0, 7.0))
-        if stop_event.is_set() or activity_event.is_set():
-            continue
-
-        gesture_to_run = random.choice(IDLE_GESTURE_POOL)
-        try:
-            gesture_to_run(controller, lock)
-        except Exception as e:
-            print(f"Error in idle gesture: {e}")
+# --- Idle Loop Thread (REMOVED) ---
 
 
 # --- Coordinated Activities ---
@@ -438,9 +366,7 @@ def main():
     controller_white = None
     controller_black = None
     stop_event = threading.Event()
-    activity_event = threading.Event()  # Event to pause idle
-    t_white_idle = None
-    t_black_idle = None
+    activity_event = threading.Event()  # Event for poweroff state
 
     try:
         # --- Setup ---
@@ -455,17 +381,11 @@ def main():
         controller_black.set_natural_position()
         time.sleep(1)
 
-        # --- Start Idle Threads ---
+        # --- Idle threads removed ---
         stop_event.clear()
         activity_event.clear()
-        t_white_idle = threading.Thread(target=idle_loop,
-                                        args=(controller_white, white_lock, stop_event, activity_event))
-        t_black_idle = threading.Thread(target=idle_loop,
-                                        args=(controller_black, black_lock, stop_event, activity_event))
-        t_white_idle.start()
-        t_black_idle.start()
 
-        print("\n--- Arms are now idling. Ready for commands. ---")
+        print("\n--- Arms ready for commands. ---")
         print("Commands:")
         print("  [white/black/both]-[yes/no/maybe] - Direct gesture control")
         print("  audio <path> [target] - Process audio file (target: white/black/both, default: both)")
@@ -540,7 +460,7 @@ def main():
             # --- Dance Command ---
             if command == 'dance':
                 print("\n--- Starting Activity: Dance ---")
-                activity_event.set()  # Pause idle
+                activity_event.set()
                 print("Waiting for arms to be free...")
                 with white_lock:
                     with black_lock:
@@ -550,21 +470,21 @@ def main():
                         controller_white.set_natural_position()
                         controller_black.set_natural_position()
                         time.sleep(1)
-                activity_event.clear()  # Resume idle
-                print("--- Activity finished. Resuming idle. ---")
+                activity_event.clear()
+                print("--- Activity finished. ---")
                 continue
 
                 # --- NEW: Power Off Command ---
             elif command == 'poweroff':
                 print("\n--- Starting Activity: Losing Power ---")
-                activity_event.set()  # Pause idle
+                activity_event.set()
                 print("Waiting for arms to be free...")
                 with white_lock:
                     with black_lock:
                         print("Arms locked. Fading...")
                         activity_lose_power(controller_white, controller_black)
                 # NOTE: We DO NOT clear the activity_event.
-                # This keeps the arms "dead" and idle threads paused.
+                # This keeps the arms "dead".
                 print("--- Arms are in 'poweroff' state. Use 'wakeup' to revive. ---")
                 continue
 
@@ -578,8 +498,8 @@ def main():
                 with white_lock:
                     with black_lock:
                         activity_wakeup(controller_white, controller_black)
-                activity_event.clear()  # Resume idle
-                print("--- Activity finished. Resuming idle. ---")
+                activity_event.clear()
+                print("--- Activity finished. ---")
                 continue
 
             # --- Gesture Command Parsing ---
@@ -630,9 +550,6 @@ def main():
         print("\n--- Exiting... ---")
         stop_event.set()
         activity_event.set()
-        if t_white_idle: t_white_idle.join()
-        if t_black_idle: t_black_idle.join()
-        print("Idle threads stopped.")
 
         if controller_white:
             controller_white.set_folded_position();
