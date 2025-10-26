@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 # --- Constants ---
-MY_PORT_WHITE = "/dev/ttyACM0"
-MY_PORT_BLACK = "/dev/ttyACM1"
+MY_PORT_WHITE = "/dev/ttyACM2"
+MY_PORT_BLACK = "/dev/ttyACM0"
 BAUDRATE = 1000000
 
 HEADER = [0xFF, 0xFF]
