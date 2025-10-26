@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "hf-transfer>=0.1.9",
+    "hf-xet>=1.2.0",
     "librosa>=0.11.0",
     "peft>=0.17.1",
+    "pyaudio>=0.2.14",
     "pyserial>=3.5",
     "torch>=2.9.0",
     "torchaudio>=2.9.0",
