@@ -1,0 +1,10 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.9
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.39.0
+causal-conv1d>=1.1.0
+mamba-ssm>=1.2.0
+tqdm>=4.65.0
+numpy>=1.24.0
